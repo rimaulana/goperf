@@ -1,0 +1,12 @@
+{
+   "R1": {
+        "address"   : "192.168.226.139:8728",
+        "username"  : "admin",
+        "password"  : ""
+    },
+   "R2": {
+        "address"   : "192.168.226.17:8728",
+        "username"  : "admin",
+        "password"  : ""
+    }
+}
