@@ -2,7 +2,8 @@ package module
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"net/http"
+	"time"
 )
 
 type List struct {
@@ -12,31 +13,57 @@ type List struct {
 
 type Lists map[string][]List
 
-func (s Server) ImportLists(p string) error {
-	var ls Lists
-	raw, err := ioutil.ReadFile(p)
-	err = json.Unmarshal(raw, &ls)
+type Prefix struct {
+	Ip_prefix string `json:"ip_prefix"`
+	Region    string `json:"region"`
+	Service   string `json:"service"`
+}
 
-	for _, l := range ls["List"] {
-		for _, a := range l.Address {
-			s.SendCommand("/ip/firewall/address-list/add;=list=" + l.Name + ";=address=" + a)
+type Prefixes map[string][]Prefix
+type IPs []string
+
+func getAwsIpRange(url string) (IPs, error) {
+	var ips IPs
+	var nc = &http.Client{
+		Timeout: time.Second * 10,
+	}
+
+	r, err := nc.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Body.Close()
+
+	var pfxs Prefixes
+	json.NewDecoder(r.Body).Decode(&pfxs)
+	for _, ip := range pfxs["prefixes"] {
+		if ip.Region == "ap-southeast-1" {
+			ips = append(ips, ip.Ip_prefix)
 		}
+	}
+
+	return ips, nil
+}
+
+func (s Server) ImportLists() error {
+	url := "https://ip-ranges.amazonaws.com/ip-ranges.json"
+	ips, err := getAwsIpRange(url)
+	for _, ip := range ips {
+		s.SendCommand("/ip/firewall/address-list/add;=list=AWS_list;=address=" + ip)
 	}
 
 	cls, err := s.GetCommand("/ip/firewall/address-list/print")
 	for _, cl := range cls.Re {
-		ls.synchronize(s, cl.Map["address"], cl.Map["list"], cl.Map[".id"])
+		ips.synchronize(s, cl.Map["address"], cl.Map["list"], cl.Map[".id"])
 	}
 
 	return err
 }
 
-func (ls Lists) synchronize(s Server, ca string, cl string, id string) bool {
-	for _, l := range ls["List"] {
-		for _, a := range l.Address {
-			if a == ca && l.Name == cl {
-				return true
-			}
+func (ips IPs) synchronize(s Server, cip string, cl string, id string) bool {
+	for _, ip := range ips {
+		if ip == cip && cl == "AWS_list" {
+			return true
 		}
 	}
 	s.SendCommand("/ip/firewall/address-list/remove;=.id=" + id)
