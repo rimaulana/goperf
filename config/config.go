@@ -1,19 +1,25 @@
+// Package config implements config loader from .yml file
+// into struct datatype
 package config
 
 import (
 	"io/ioutil"
+
+	yaml "gopkg.in/yaml.v2"
 )
 
-// Config info
+// Config struct define the config data structure
 type Config struct {
 	reader func(filename string) ([]byte, error)
 }
 
-// New bla bla
+// New used to initiate config struct for thread safe instance
 func New() *Config {
 	return &Config{reader: ioutil.ReadFile}
 }
 
+// StubReader is used to be able to stub ioutil.ReadFile function
+// for testing purpose
 func (cfg *Config) StubReader(stub func(filename string) ([]byte, error)) {
 	cfg.reader = stub
 }
@@ -27,15 +33,16 @@ type ISPConfig struct {
 	CheckIP string `yaml:"checkip"`
 }
 
-func (cfg *Config) Load(configPath string) (string, error) {
+// Load will load a config from a yml file
+func (cfg *Config) Load(configPath string) ([]ISPConfig, error) {
 	rawData, err := cfg.reader(configPath)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return string(rawData), nil
+	buffer := []ISPConfig{}
+	errs := yaml.Unmarshal(rawData, &buffer)
+	if errs != nil {
+		return nil, errs
+	}
+	return buffer, nil
 }
-
-// Reader interface is used to easily stub ioutil package
-// type Reader interface {
-// 	ReadFile(filename string) ([]byte, error)
-// }
