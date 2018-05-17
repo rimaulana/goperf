@@ -3,12 +3,19 @@ TEST_MODE ?= count
 VERSION ?= latest
 BIN_DIR := $(GOPATH)/bin 
 GOLINT = $(BIN_DIR)/golint
+GOVENDOR = $(BIN_DIR)/govendor
 PACKAGES = $(shell go list ./... | grep -v vendor)
 GOLINT_REPO = github.com/golang/lint/golint
 PLATFORM := windows linux
 OS = $(word 1, $@)
 
-.PHONY: lint test clean cover
+.PHONY: lint test clean cover deps
+
+$(GOVENDOR):
+	go get -u github.com/kardianos/govendor
+
+deps: $(GOVENDOR)
+	govendor sync
 
 $(GOLINT):
 	go get -u $(GOLINT_REPO)

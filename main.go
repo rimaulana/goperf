@@ -45,7 +45,7 @@ type Route struct {
 
 // MakeRouteDefault docs
 func (r Route) MakeRouteDefault(dest Server) error {
-	err := exec.Command("ip", "route", "replace", dest.Ip, "via", r.Ip, "dev", r.Dev).Run()
+	err := exec.Command("ip", "route", "replace", dest.IP, "via", r.IP, "dev", r.Dev).Run()
 	if err != nil {
 		return err
 	}
