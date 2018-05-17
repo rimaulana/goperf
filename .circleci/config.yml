@@ -1,0 +1,30 @@
+version: 2.0
+jobs:
+  build:
+    docker:
+      - image: circleci/golang:1.8
+    working_directory: /go/src/github.com/rimaulana/goperf
+    steps:
+      - checkout
+      - run:
+          name: Download Code Climate Reporter
+          command: |
+            curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter
+            chmod +x ./cc-test-reporter
+      - run:
+          name: Linting codes
+          command: make lint
+      - run:
+          name: Code Climate coverage
+          command: |
+            ./cc-test-reporter before-build
+            make test TEST_MODE=set
+            ./cc-test-reporter after-build
+      - run:
+          name: Testing codes
+          command: |
+            make test
+            mv c.out coverage.out
+      - run:
+          name: Upload test result to codecov
+          command: bash <(curl -s https://codecov.io/bash)
