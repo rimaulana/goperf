@@ -15,29 +15,35 @@ import (
 const iperfInterval = "1"
 const iperfDuration = "2"
 
+// IperfReport docs
 type IperfReport struct {
 	Time      int64   `json:"time"`
 	Bandwidth float64 `json:"average_bandwidth"`
 }
 
+// IperfReports docs
 type IperfReports struct {
 	StartTime string                 `json:"Start Time"`
 	Results   map[string]IperfReport `json:"Results"`
 }
 
+// AddReport docs
 func (i *IperfReports) AddReport(route Route, report IperfReport, mode string) {
 	i.Results[route.Name+"-"+mode] = report
 }
 
+// IperfMeasurementMode docs
 var IperfMeasurementMode = [2]string{"Sending", "Receiving"}
 
+// Route docs
 type Route struct {
 	Name string `json:"name"`
 	Dev  string `json:"dev"`
-	Ip   string `json:"ip"`
-	Dns  string `json:"dns"`
+	IP   string `json:"ip"`
+	DNS  string `json:"dns"`
 }
 
+// MakeRouteDefault docs
 func (r Route) MakeRouteDefault(dest Server) error {
 	err := exec.Command("ip", "route", "replace", dest.Ip, "via", r.Ip, "dev", r.Dev).Run()
 	if err != nil {
@@ -46,35 +52,37 @@ func (r Route) MakeRouteDefault(dest Server) error {
 	return nil
 }
 
+// Routes docs
 type Routes []Route
 
+// ReadConfigFromFile docs
 func ReadConfigFromFile(filepath string) (Routes, Servers, error) {
 	raw, err := ioutil.ReadFile(filepath)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	var configJson map[string]*json.RawMessage
-	err = json.Unmarshal(raw, &configJson)
+	var configJSON map[string]*json.RawMessage
+	err = json.Unmarshal(raw, &configJSON)
 	if err != nil {
 		return nil, nil, err
 	}
-	routesJson, ok := configJson["routes"]
+	routesJSON, ok := configJSON["routes"]
 	if !ok {
 		return nil, nil, errors.New("There is no 'routes' path in json file " + filepath)
 	}
-	serversJson, ok := configJson["servers"]
+	serversJSON, ok := configJSON["servers"]
 	if !ok {
 		return nil, nil, errors.New("There is no 'servers' path in json file " + filepath)
 	}
 	var routes Routes
 	var servers Servers
 
-	err = json.Unmarshal(*routesJson, &routes)
+	err = json.Unmarshal(*routesJSON, &routes)
 	if err != nil {
 		return nil, nil, err
 	}
-	err = json.Unmarshal(*serversJson, &servers)
+	err = json.Unmarshal(*serversJSON, &servers)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -82,21 +90,23 @@ func ReadConfigFromFile(filepath string) (Routes, Servers, error) {
 	return routes, servers, nil
 }
 
+// Server docs
 type Server struct {
 	Username string `json:"username"`
-	Ip       string `json:"ip"`
+	IP       string `json:"ip"`
 	Port     string `json:"port"`
 }
 
+// CheckConnection docs
 func (s Server) CheckConnection(r Route) error {
-	_, err := net.DialTimeout("tcp", r.Dns+":53", 5*time.Second)
+	_, err := net.DialTimeout("tcp", r.DNS+":53", 5*time.Second)
 	if err != nil {
-		_, err2 := net.DialTimeout("udp", r.Dns+":53", 5*time.Second)
+		_, err2 := net.DialTimeout("udp", r.DNS+":53", 5*time.Second)
 		if err2 != nil {
 			return err2
 		}
 	}
-	_, err = net.DialTimeout("tcp", s.Ip+":"+s.Port, 5*time.Second)
+	_, err = net.DialTimeout("tcp", s.IP+":"+s.Port, 5*time.Second)
 	if err != nil {
 		fmt.Println(err)
 		return err
@@ -104,15 +114,16 @@ func (s Server) CheckConnection(r Route) error {
 	return nil
 }
 
+// MeasureBWIperf docs
 func MeasureBWIperf(route Route, server Server, mode string) (IperfReport, error) {
 	var res []byte
 	var err error
 	var iperfReport IperfReport
 	var iperfDataStruct map[string]interface{}
 	var cmd *exec.Cmd
-	cmd = exec.Command("timeout", "5", "iperf3", "-c", server.Ip, "-p", server.Port, "-i", iperfInterval, "-t", iperfDuration, "-J")
+	cmd = exec.Command("timeout", "5", "iperf3", "-c", server.IP, "-p", server.Port, "-i", iperfInterval, "-t", iperfDuration, "-J")
 	if mode == "Receiving" {
-		cmd = exec.Command("timeout", "5", "iperf3", "-c", server.Ip, "-p", server.Port, "-i", iperfInterval, "-t", iperfDuration, "-J", "-R")
+		cmd = exec.Command("timeout", "5", "iperf3", "-c", server.IP, "-p", server.Port, "-i", iperfInterval, "-t", iperfDuration, "-J", "-R")
 	}
 	log.Println(cmd.Args)
 	res, err = cmd.Output()
@@ -155,15 +166,19 @@ func MeasureBWIperf(route Route, server Server, mode string) (IperfReport, error
 	return iperfReport, nil
 }
 
+// Servers docs
 type Servers []Server
 
+// ISPRuntime docs
 type ISPRuntime struct {
 	Status string `json:"status"`
 	Count  int    `json:"count"`
 }
 
+// ISPRuntimes docs
 type ISPRuntimes map[string]ISPRuntime
 
+// ReadRuntimeFromFile docs
 func ReadRuntimeFromFile(filepath string) (ISPRuntimes, error) {
 	rawFile, err := ioutil.ReadFile(filepath)
 	if err != nil {
@@ -177,6 +192,7 @@ func ReadRuntimeFromFile(filepath string) (ISPRuntimes, error) {
 	return ispRuntimes, nil
 }
 
+// UpdateRuntime docs
 func (i *ISPRuntimes) UpdateRuntime(route Route, status string) {
 	if (*i)[route.Name].Status == "up" && status == "down" {
 		newStatus := ISPRuntime{Status: "down", Count: 0}
@@ -192,6 +208,7 @@ func (i *ISPRuntimes) UpdateRuntime(route Route, status string) {
 	}
 }
 
+// WriteToFile docs
 func (i ISPRuntimes) WriteToFile(filepath string) error {
 	jsonfile, err := json.Marshal(i)
 	if err != nil {
@@ -222,23 +239,23 @@ func main() {
 	}
 
 	for _, server := range servers {
-		log.Printf("Measuring bandwidth to server %s:%s\n", server.Ip, server.Port)
+		log.Printf("Measuring bandwidth to server %s:%s\n", server.IP, server.Port)
 		for _, route := range routes {
 
-			log.Println("Change default route to : ", route.Ip, " device ", route.Dev)
+			log.Println("Change default route to : ", route.IP, " device ", route.Dev)
 
 			err := route.MakeRouteDefault(server)
 			if err != nil {
 				log.Fatal(err)
 			}
 
-			log.Printf("Check connection to server %s:%s\n", server.Ip, server.Port)
+			log.Printf("Check connection to server %s:%s\n", server.IP, server.Port)
 			err = server.CheckConnection(route)
 			if err != nil {
-				log.Printf("Connection to server %s:%s is DOWN\n", server.Ip, server.Port)
+				log.Printf("Connection to server %s:%s is DOWN\n", server.IP, server.Port)
 				runtimes.UpdateRuntime(route, "down")
 			} else {
-				log.Printf("Connection to server %s:%s is UP\n", server.Ip, server.Port)
+				log.Printf("Connection to server %s:%s is UP\n", server.IP, server.Port)
 				runtimes.UpdateRuntime(route, "up")
 			}
 			for _, mode := range IperfMeasurementMode {
